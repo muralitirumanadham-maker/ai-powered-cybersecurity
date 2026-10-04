@@ -1,0 +1,11 @@
+services:
+  cyber-guard:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      DATABASE_URL: sqlite:///./cyber_guard.db
+    volumes:
+      - ./cyber_guard.db:/app/cyber_guard.db

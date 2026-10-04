@@ -1,0 +1,14 @@
+{
+  "duration": 2.4,
+  "protocol": "TCP",
+  "src_bytes": 180,
+  "dst_bytes": 90,
+  "packets": 40,
+  "bytes_per_packet": 6.75,
+  "syn_count": 32,
+  "ack_count": 4,
+  "failed_logins": 0,
+  "unique_dst_ports": 24,
+  "dst_port": 443,
+  "flow_rate": 16.7
+}

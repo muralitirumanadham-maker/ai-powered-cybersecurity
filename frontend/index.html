@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI-Powered Cybersecurity Threat Detection and Investigation Agent</title>
+<style>
+:root { --bg:#0b1020; --panel:#121a2e; --muted:#8fa1bf; --text:#eef4ff; --line:#243250; --accent:#58a6ff; }
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,Arial,sans-serif}
+header{padding:28px 5%;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:20px;align-items:center}
+h1{margin:0;font-size:28px}.sub{color:var(--muted);margin-top:6px}
+main{padding:28px 5%;max-width:1400px;margin:auto}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+.big{font-size:30px;font-weight:700;margin-top:8px}
+.controls{display:flex;gap:12px;flex-wrap:wrap;margin:22px 0}
+button,input{background:#0f172a;color:var(--text);border:1px solid var(--line);padding:11px 14px;border-radius:9px}
+button{cursor:pointer;background:#17355d;border-color:#275f9f}
+button:hover{background:#214979} button:disabled{opacity:.55;cursor:not-allowed}
+table{width:100%;border-collapse:collapse}.tablewrap{overflow:auto}
+th,td{text-align:left;padding:12px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{color:var(--muted)}.badge{padding:5px 9px;border-radius:999px;background:#20304b}
+section{margin-top:24px}.muted{color:var(--muted)}pre{white-space:pre-wrap;line-height:1.5}
+@media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:550px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>AI-Powered Cybersecurity Threat Detection and Investigation Agent</h1>
+    <div class="sub">Machine Learning + Generative AI security investigation system</div>
+  </div>
+  <div class="muted">ML + Isolation Forest + LangGraph + Gemini</div>
+</header>
+
+<main>
+  <div class="grid">
+    <div class="card"><div class="muted">Incidents</div><div id="count" class="big">0</div></div>
+    <div class="card"><div class="muted">High Risk</div><div id="high" class="big">0</div></div>
+    <div class="card"><div class="muted">Latest Threat</div><div id="latest" class="big">—</div></div>
+    <div class="card"><div class="muted">API</div><div class="big">ONLINE</div></div>
+  </div>
+
+  <div class="controls">
+    <button onclick="loadDemo()">Load demo data</button>
+    <input id="csv" type="file" accept=".csv">
+    <button onclick="uploadCSV()">Analyze CSV</button>
+    <button id="refreshButton" onclick="refreshIncidents()">Refresh incidents</button>
+    <button id="clearButton" onclick="clearIncidents()">Clear incidents</button>
+  </div>
+  <div id="operationStatus" class="card" style="margin-top:12px;padding:12px 16px;">
+    <span class="muted">Status:</span> Ready
+  </div>
+
+  <section class="card">
+    <h2>Incident History</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>ID</th><th>Threat</th><th>Confidence</th><th>Anomaly</th><th>Risk</th><th>Time</th><th>Evidence</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Investigation Summary</h2>
+    <pre id="summary" class="muted">Run an analysis to see the analyst-oriented explanation.</pre>
+  </section>
+</main>
+
+<script>
+let incidents = [];
+
+const statusElement = document.getElementById('operationStatus');
+const summaryElement = document.getElementById('summary');
+
+function setOperationStatus(message) {
+  if (statusElement) {
+    statusElement.innerHTML =
+      `<span class="muted">Status:</span> ${escapeHtml(message)}`;
+  }
+}
+
+async function refreshIncidents(showStatus = true) {
+  try {
+    if (showStatus) setOperationStatus('Refreshing incident history...');
+
+    const response = await fetch(
+      `/api/incidents?limit=50&_=${Date.now()}`,
+      { cache: 'no-store' }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.detail || `Server returned ${response.status}`);
+    }
+
+    incidents = data;
+
+    document.getElementById('count').textContent = incidents.length;
+    document.getElementById('high').textContent =
+      incidents.filter(x => x.risk_score >= 75).length;
+    document.getElementById('latest').textContent =
+      incidents[0]?.threat || '—';
+
+    const body = document.getElementById('rows');
+
+    if (!incidents.length) {
+      body.innerHTML = `
+        <tr>
+          <td colspan="7" class="muted">No incidents found.</td>
+        </tr>`;
+      summaryElement.textContent =
+        'Run an analysis to see the analyst-oriented explanation.';
+      if (showStatus) setOperationStatus('No incidents found.');
+      return;
+    }
+
+    body.innerHTML = incidents.map(x => `
+      <tr>
+        <td>${x.id}</td>
+        <td><span class="badge">${escapeHtml(x.threat)}</span></td>
+        <td>${(x.confidence * 100).toFixed(1)}%</td>
+        <td>${x.anomaly_score.toFixed(2)}</td>
+        <td>${x.risk_score.toFixed(1)}</td>
+        <td>${new Date(x.created_at).toLocaleString()}</td>
+        <td>${escapeHtml(x.evidence.join(' | '))}</td>
+      </tr>
+    `).join('');
+
+    summaryElement.textContent = incidents[0].summary || 'Investigation completed.';
+
+    if (showStatus) {
+      setOperationStatus(`Showing ${incidents.length} latest incidents.`);
+    }
+  } catch (error) {
+    console.error('Refresh error:', error);
+    setOperationStatus(`Refresh failed: ${error.message}`);
+    if (showStatus) {
+      alert(`Refresh failed.\n\n${error.message}`);
+    }
+  }
+}
+
+async function clearIncidents() {
+  const button = document.getElementById('clearButton');
+
+  const confirmed = confirm(
+    'Clear all stored incidents?\n\nThis will remove the current incident history and reset the dashboard counters to 0.'
+  );
+
+  if (!confirmed) return;
+
+  try {
+    button.disabled = true;
+    button.textContent = 'Clearing...';
+    setOperationStatus('Clearing incident history...');
+
+    const response = await fetch(`/api/incidents?_=${Date.now()}`, {
+      method: 'DELETE',
+      cache: 'no-store'
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.detail || JSON.stringify(data));
+    }
+
+    incidents = [];
+
+    document.getElementById('count').textContent = '0';
+    document.getElementById('high').textContent = '0';
+    document.getElementById('latest').textContent = '—';
+
+    document.getElementById('rows').innerHTML = `
+      <tr>
+        <td colspan="7" class="muted">No incidents found. Run an analysis to create new incidents.</td>
+      </tr>`;
+
+    summaryElement.textContent =
+      'No incidents available. Run an analysis to see the analyst-oriented explanation.';
+
+    setOperationStatus(
+      `Incident history cleared successfully. ${data.deleted_count} incidents removed.`
+    );
+  } catch (error) {
+    console.error('Clear incidents error:', error);
+    setOperationStatus(`Clear failed: ${error.message}`);
+    alert(`Could not clear incidents.\n\n${error.message}`);
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Clear incidents';
+  }
+}
+
+async function loadDemo() {
+  const button = document.querySelector('button[onclick="loadDemo()"]');
+
+  try {
+    button.disabled = true;
+    button.textContent = 'Analyzing demo...';
+    setOperationStatus('Loading demo data and running ML + investigation...');
+
+    const response = await fetch(`/api/demo/analyze?_=${Date.now()}`, {
+      method: 'POST',
+      cache: 'no-store'
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.detail || JSON.stringify(data));
+    }
+
+    setOperationStatus(
+      `Analysis completed: ${data.processed_rows} demo records. Updating dashboard...`
+    );
+
+    await refreshIncidents(false);
+
+    setOperationStatus(
+      `Demo analysis completed successfully: ${data.processed_rows} records analyzed.`
+    );
+  } catch (error) {
+    console.error('Demo error:', error);
+    setOperationStatus(`Demo analysis failed: ${error.message}`);
+    alert(`Could not analyze demo data.\n\n${error.message}`);
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Load demo data';
+  }
+}
+
+async function uploadCSV() {
+  const file = document.getElementById('csv').files[0];
+
+  if (!file) {
+    alert('Choose a CSV file first.');
+    return;
+  }
+
+  const button = document.querySelector('button[onclick="uploadCSV()"]');
+
+  try {
+    button.disabled = true;
+    button.textContent = 'Analyzing...';
+    setOperationStatus(
+      `Analyzing ${file.name}. Please wait — the first 50 records are being processed...`
+    );
+
+    const fd = new FormData();
+    fd.append('file', file);
+
+    const response = await fetch('/api/detect/upload', {
+      method: 'POST',
+      body: fd,
+      cache: 'no-store'
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.detail || JSON.stringify(data));
+    }
+
+    setOperationStatus(
+      `Analysis completed: ${data.processed_rows} records. Updating dashboard...`
+    );
+
+    await refreshIncidents(false);
+
+    setOperationStatus(
+      `${data.filename}: ${data.processed_rows} records analyzed successfully.`
+    );
+  } catch (error) {
+    console.error('CSV analysis error:', error);
+    setOperationStatus(`CSV analysis failed: ${error.message}`);
+    alert(`CSV analysis failed.\n\n${error.message}`);
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Analyze CSV';
+  }
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+// Load the current state when the dashboard opens.
+refreshIncidents(false);
+</script>
+</body>
+</html>
